@@ -95,6 +95,3 @@ func (h1 *Program) GetWeaknesses() (*h1Types.Weaknesses, error)
 
 The authentication token can be stored in `~/.config/h1_token`. If the token is not provided when initializing the client, it will be read from this file.
 
----
-
-Happy hacking!

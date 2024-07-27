@@ -28,9 +28,11 @@ type ProgramAttributes struct {
 }
 
 type Relationships struct {
-	StructuredScopes struct {
-		Data []ScopeData `json:"data"`
-	} `json:"structured_scopes"`
+	StructuredScopes StructuredScopes `json:"structured_scopes"`
+}
+
+type StructuredScopes struct {
+	Data []ScopeData `json:"data"`
 }
 
 type ScopeData struct {

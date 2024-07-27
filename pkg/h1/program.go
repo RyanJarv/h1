@@ -1,46 +1,38 @@
-package lib
+package h1
 
 import (
 	"encoding/json"
 	"fmt"
-	h1Types "github.com/ryanjarv/h1/pkg/types"
+	"github.com/ryanjarv/h1/pkg/types"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
-// NewHackeroneInput is the input parameters for NewHackerone.
-//
-// Username must be provided.
-// Token is optional, if not provided it will be read from ~/.config/h1_token.
-type NewHackeroneInput struct {
-	Username string
+func (h1 *Hackerone) Programs() ([]Program, error) {
+	uri := fmt.Sprintf("https://api.hackerone.com/v1/hackers/programs")
 
-	Token string
-}
+	var result []Program
 
-func NewHackerone(input *NewHackeroneInput) *Hackerone {
-	if input.Token == "" {
-		input.Token = GetH1Token()
+	for uri != "" {
+		var err error
+		var resp []byte
+		resp, uri, err = h1.send("GET", uri, nil)
+		if err != nil {
+			return nil, fmt.Errorf("Program.GetDetails: getting program: %w", err)
+		}
+
+		programs := struct {
+			Data []Program `json:"data"`
+		}{}
+		if err := json.Unmarshal(resp, &programs); err != nil {
+			return nil, fmt.Errorf("Program.GetDetails: failed to unmarshal program: %w", err)
+		}
+		result = append(result, programs.Data...)
 	}
 
-	return &Hackerone{
-		username: input.Username,
-		token:    strings.Trim(input.Token, " \t\n"),
-		client:   http.DefaultClient,
-	}
-}
-
-type Client interface {
-	Do(req *http.Request) (*http.Response, error)
-}
-
-type Hackerone struct {
-	token    string
-	username string
-	client   Client
+	return result, nil
 }
 
 func (h1 *Hackerone) Program(id string) *Program {
@@ -51,11 +43,11 @@ func (h1 *Hackerone) Program(id string) *Program {
 }
 
 type Program struct {
-	Hackerone
+	Hackerone `json:"-"`
 	ProgramId string `json:"id"`
 }
 
-func (h1 *Program) GetDetail() (*h1Types.ProgramDetail, error) {
+func (h1 *Program) GetDetail() (*types.ProgramDetail, error) {
 	uri := fmt.Sprintf("https://api.hackerone.com/v1/hackers/programs/%s", h1.ProgramId)
 
 	resp, uri, err := h1.send("GET", uri, nil)
@@ -65,7 +57,7 @@ func (h1 *Program) GetDetail() (*h1Types.ProgramDetail, error) {
 		return nil, fmt.Errorf("failed to get all pages: %s", uri)
 	}
 
-	program := h1Types.ProgramDetail{}
+	program := types.ProgramDetail{}
 	err = json.Unmarshal(resp, &program)
 	if err != nil {
 		return nil, fmt.Errorf("Program.GetDetails: failed to unmarshal program: %w", err)
@@ -74,7 +66,7 @@ func (h1 *Program) GetDetail() (*h1Types.ProgramDetail, error) {
 	return &program, nil
 }
 
-func (h1 *Program) GetWeaknesses() (*h1Types.Weaknesses, error) {
+func (h1 *Program) GetWeaknesses() (*types.Weaknesses, error) {
 	uri := fmt.Sprintf("https://api.hackerone.com/v1/hackers/programs/%s/weaknesses", h1.ProgramId)
 
 	var resp []byte
@@ -87,7 +79,7 @@ func (h1 *Program) GetWeaknesses() (*h1Types.Weaknesses, error) {
 		return nil, fmt.Errorf("failed to get all pages")
 	}
 
-	weaknesses := h1Types.Weaknesses{}
+	weaknesses := types.Weaknesses{}
 	err = json.Unmarshal(resp, &weaknesses)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal program: %w", err)
