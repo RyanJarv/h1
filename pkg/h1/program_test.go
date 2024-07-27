@@ -7,6 +7,7 @@ import (
 	"github.com/ryanjarv/h1/pkg/types"
 	"io"
 	"net/http"
+	"os"
 	"testing"
 )
 
@@ -24,7 +25,7 @@ func (m *MockClient) Do(req *http.Request) (*http.Response, error) {
 
 func TestProgram_GetDetail(t *testing.T) {
 	type fields struct {
-		Hackerone Hackerone
+		Hackerone *Hackerone
 		ProgramId string
 		client    Client
 	}
@@ -38,7 +39,7 @@ func TestProgram_GetDetail(t *testing.T) {
 		{
 			name: "TestGetDetail",
 			fields: fields{
-				Hackerone: Hackerone{
+				Hackerone: &Hackerone{
 					token:    "token",
 					username: "username",
 					client: &MockClient{
@@ -100,7 +101,7 @@ func TestProgram_GetDetail(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			h1 := &Program{
 				Hackerone: tt.fields.Hackerone,
-				ProgramId: tt.fields.ProgramId,
+				Id:        tt.fields.ProgramId,
 			}
 			got, err := h1.GetDetail()
 			if (err != nil) != tt.wantErr {
@@ -121,7 +122,7 @@ func TestProgram_GetDetail(t *testing.T) {
 
 func TestProgram_Programs(t *testing.T) {
 	type fields struct {
-		Hackerone Hackerone
+		Hackerone *Hackerone
 		ProgramId string
 		client    Client
 	}
@@ -135,7 +136,7 @@ func TestProgram_Programs(t *testing.T) {
 		{
 			name: "TestListPrograms",
 			fields: fields{
-				Hackerone: Hackerone{
+				Hackerone: &Hackerone{
 					token:    "token",
 					username: "username",
 					client: &MockClient{
@@ -148,13 +149,13 @@ func TestProgram_Programs(t *testing.T) {
 			},
 			wantErr: false,
 			want: []Program{
-				{ProgramId: "13"},
+				{Id: "13"},
 			},
 		},
 		{
 			name: "pagination works",
 			fields: fields{
-				Hackerone: Hackerone{
+				Hackerone: &Hackerone{
 					token:    "token",
 					username: "username",
 					client: &MockClient{
@@ -168,8 +169,8 @@ func TestProgram_Programs(t *testing.T) {
 			wantErr:           false,
 			wantTimesDoCalled: 2,
 			want: []Program{
-				{ProgramId: "1"},
-				{ProgramId: "2"},
+				{Id: "1"},
+				{Id: "2"},
 			},
 		},
 	}
@@ -177,7 +178,7 @@ func TestProgram_Programs(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			h1 := &Program{
 				Hackerone: tt.fields.Hackerone,
-				ProgramId: tt.fields.ProgramId,
+				Id:        tt.fields.ProgramId,
 			}
 			got, err := h1.Programs()
 			if (err != nil) != tt.wantErr {
@@ -185,7 +186,7 @@ func TestProgram_Programs(t *testing.T) {
 				return
 			}
 
-			if diff := cmp.Diff(tt.want, got, cmpopts.IgnoreUnexported(Hackerone{})); diff != "" {
+			if diff := cmp.Diff(tt.want, got, cmpopts.IgnoreFields(Program{}, "Hackerone")); diff != "" {
 				t.Errorf("Programs() mismatch (-want +got):\n%s", diff)
 			}
 
@@ -194,5 +195,26 @@ func TestProgram_Programs(t *testing.T) {
 				t.Errorf("Programs() called %d times, want %d", called, tt.wantTimesDoCalled)
 			}
 		})
+	}
+}
+
+func TestProgram__functional(t *testing.T) {
+	user := os.Getenv("H1_USERNAME")
+	if user == "" {
+		t.Skip("no H1_USERNAME set")
+	}
+
+	h1 := NewHackerone(&NewHackeroneInput{Username: user})
+	programs, err := h1.Programs()
+	if err != nil {
+		t.Fatalf("getting programs: %s", err)
+	}
+
+	for _, p := range programs {
+		// Get the program details
+		_, err := p.GetDetail()
+		if err != nil {
+			t.Fatalf("getting detail: %s: %s", p.Id, err)
+		}
 	}
 }

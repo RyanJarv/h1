@@ -13,7 +13,7 @@ import (
 func (h1 *Hackerone) Programs() ([]Program, error) {
 	uri := fmt.Sprintf("https://api.hackerone.com/v1/hackers/programs")
 
-	var result []Program
+	var programs []Program
 
 	for uri != "" {
 		var err error
@@ -23,32 +23,48 @@ func (h1 *Hackerone) Programs() ([]Program, error) {
 			return nil, fmt.Errorf("Program.GetDetails: getting program: %w", err)
 		}
 
-		programs := struct {
-			Data []Program `json:"data"`
+		data := struct {
+			Data []types.ProgramDetail
 		}{}
-		if err := json.Unmarshal(resp, &programs); err != nil {
+		if err := json.Unmarshal(resp, &data); err != nil {
 			return nil, fmt.Errorf("Program.GetDetails: failed to unmarshal program: %w", err)
 		}
-		result = append(result, programs.Data...)
+
+		for _, p := range data.Data {
+			programs = append(programs, Program{
+				Hackerone:         h1,
+				Id:                p.Id,
+				Type:              p.Type,
+				Handle:            p.Attributes.Handle,
+				ProgramAttributes: p.Attributes,
+			})
+		}
 	}
 
-	return result, nil
+	return programs, nil
 }
 
-func (h1 *Hackerone) Program(id string) *Program {
+func (h1 *Hackerone) Program(handle string) *Program {
 	return &Program{
-		Hackerone: *h1,
-		ProgramId: id,
+		Hackerone: h1,
+		Handle:    handle,
 	}
 }
 
 type Program struct {
-	Hackerone `json:"-"`
-	ProgramId string `json:"id"`
+	*Hackerone `json:"-"`
+
+	// Handle is required for fetching program details.
+	Handle string `json:"handle"`
+
+	Id   string `json:"id,omitempty"`
+	Type string `json:"type,omitempty"`
+
+	types.ProgramAttributes
 }
 
 func (h1 *Program) GetDetail() (*types.ProgramDetail, error) {
-	uri := fmt.Sprintf("https://api.hackerone.com/v1/hackers/programs/%s", h1.ProgramId)
+	uri := fmt.Sprintf("https://api.hackerone.com/v1/hackers/programs/%s", h1.Handle)
 
 	resp, uri, err := h1.send("GET", uri, nil)
 	if err != nil {
@@ -67,7 +83,7 @@ func (h1 *Program) GetDetail() (*types.ProgramDetail, error) {
 }
 
 func (h1 *Program) GetWeaknesses() (*types.Weaknesses, error) {
-	uri := fmt.Sprintf("https://api.hackerone.com/v1/hackers/programs/%s/weaknesses", h1.ProgramId)
+	uri := fmt.Sprintf("https://api.hackerone.com/v1/hackers/programs/%s/weaknesses", h1.Handle)
 
 	var resp []byte
 	var err error
