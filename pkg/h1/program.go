@@ -10,38 +10,40 @@ import (
 	"path/filepath"
 )
 
-func (h1 *Hackerone) Programs() ([]Program, error) {
+func (h1 *Hackerone) Programs(yield func(*Program, error) bool) {
 	uri := fmt.Sprintf("https://api.hackerone.com/v1/hackers/programs")
-
-	var programs []Program
 
 	for uri != "" {
 		var err error
 		var resp []byte
 		resp, uri, err = h1.send("GET", uri, nil)
 		if err != nil {
-			return nil, fmt.Errorf("Program.GetDetails: getting program: %w", err)
+			if !yield(nil, fmt.Errorf("Program.GetDetails: getting program: %w", err)) {
+				return
+			}
 		}
 
 		data := struct {
 			Data []types.ProgramDetail
 		}{}
 		if err := json.Unmarshal(resp, &data); err != nil {
-			return nil, fmt.Errorf("Program.GetDetails: failed to unmarshal program: %w", err)
+			if !yield(nil, fmt.Errorf("Program.GetDetails: failed to unmarshal program: %w", err)) {
+				return
+			}
 		}
 
 		for _, p := range data.Data {
-			programs = append(programs, Program{
+			if !yield(&Program{
 				Hackerone:         h1,
 				Id:                p.Id,
 				Type:              p.Type,
 				Handle:            p.Attributes.Handle,
 				ProgramAttributes: p.Attributes,
-			})
+			}, nil) {
+				return
+			}
 		}
 	}
-
-	return programs, nil
 }
 
 func (h1 *Hackerone) Program(handle string) *Program {

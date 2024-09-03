@@ -180,7 +180,7 @@ func TestProgram_Programs(t *testing.T) {
 				Hackerone: tt.fields.Hackerone,
 				Id:        tt.fields.ProgramId,
 			}
-			got, err := h1.Programs()
+			_ := h1.Programs()
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Programs() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -205,7 +205,7 @@ func TestProgram__functional(t *testing.T) {
 	}
 
 	h1 := NewHackerone(&NewHackeroneInput{Username: user})
-	programs, err := h1.Programs()
+	_ := h1.Programs()
 	if err != nil {
 		t.Fatalf("getting programs: %s", err)
 	}
