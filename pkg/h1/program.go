@@ -154,9 +154,12 @@ func (h1 *Hackerone) nextPage(body []byte) (string, error) {
 }
 
 func GetH1Token() string {
-	if token, err := os.ReadFile(filepath.Join(os.Getenv("HOME"), ".config/h1_token")); err != nil {
-		return ""
-	} else {
+	if token, err := os.ReadFile(filepath.Join(os.Getenv("HOME"), ".config/h1_token")); err == nil {
 		return string(token)
 	}
+
+	if token := os.Getenv("H1_TOKEN"); token != "" {
+		return string(token)
+	}
+	return ""
 }

@@ -10,21 +10,21 @@ type ProgramDetail struct {
 }
 
 type ProgramAttributes struct {
-	Handle                          string    `json:"handle"`
-	Name                            string    `json:"name"`
-	Currency                        string    `json:"currency"`
-	ProfilePicture                  string    `json:"profile_picture"`
-	SubmissionState                 string    `json:"submission_state"`
-	TriageActive                    bool      `json:"triage_active"`
-	State                           string    `json:"state"`
-	StartedAcceptingAt              time.Time `json:"started_accepting_at"`
-	NumberOfReportsForUser          int       `json:"number_of_reports_for_user"`
-	NumberOfValidReportsForUser     int       `json:"number_of_valid_reports_for_user"`
-	BountyEarnedForUser             float64   `json:"bounty_earned_for_user"`
-	LastInvitationAcceptedAtForUser time.Time `json:"last_invitation_accepted_at_for_user"`
-	Bookmarked                      bool      `json:"bookmarked"`
-	AllowsBountySplitting           bool      `json:"allows_bounty_splitting"`
-	OffersBounties                  bool      `json:"offers_bounties"`
+	Handle                          string    `json:"handle,omitempty"`
+	Name                            string    `json:"name,omitempty"`
+	Currency                        string    `json:"currency,omitempty"`
+	ProfilePicture                  string    `json:"profile_picture,omitempty"`
+	SubmissionState                 string    `json:"submission_state,omitempty"`
+	TriageActive                    bool      `json:"triage_active,omitempty"`
+	State                           string    `json:"state,omitempty"`
+	StartedAcceptingAt              time.Time `json:"started_accepting_at,omitempty"`
+	NumberOfReportsForUser          int       `json:"number_of_reports_for_user,omitempty"`
+	NumberOfValidReportsForUser     int       `json:"number_of_valid_reports_for_user,omitempty"`
+	BountyEarnedForUser             float64   `json:"bounty_earned_for_user,omitempty"`
+	LastInvitationAcceptedAtForUser time.Time `json:"last_invitation_accepted_at_for_user,omitempty"`
+	Bookmarked                      bool      `json:"bookmarked,omitempty"`
+	AllowsBountySplitting           bool      `json:"allows_bounty_splitting,omitempty"`
+	OffersBounties                  bool      `json:"offers_bounties,omitempty"`
 }
 
 type Relationships struct {
