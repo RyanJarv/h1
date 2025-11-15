@@ -1,14 +1,22 @@
 package h1
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"github.com/ryanjarv/h1/pkg/types"
 	"io"
+	"log"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
+	"syscall"
+
+	"github.com/ryanjarv/h1/pkg/types"
 )
+
+const MaxRetries = 3
 
 func (h1 *Hackerone) Programs(yield func(*Program, error) bool) {
 	uri := fmt.Sprintf("https://api.hackerone.com/v1/hackers/programs")
@@ -107,6 +115,28 @@ func (h1 *Program) GetWeaknesses() (*types.Weaknesses, error) {
 }
 
 func (h1 *Hackerone) send(method string, uri string, body io.Reader) ([]byte, string, error) {
+	all, err := io.ReadAll(body)
+	if err != nil {
+		return nil, "", fmt.Errorf("Program.GetDetails: failed to read all: %w", err)
+	}
+
+	for retries := 0; retries < MaxRetries; retries++ {
+		respBody, next, err := h1.send_once(method, uri, bytes.NewReader(all))
+		// Check for specific error types
+		var opErr *net.OpError
+		var sysErr *syscall.Errno
+		if errors.As(err, &opErr) {
+			if errors.As(opErr.Err, &sysErr) && errors.Is(*sysErr, syscall.ECONNRESET) {
+				// Handle the connection reset specifically, e.g., retry or log
+				log.Printf("error: connection reset: %s", err)
+				continue
+			}
+		}
+		return respBody, next, nil
+	}
+	log.Printf("error: exceeded max retries for %s %s", method, uri)
+}
+func (h1 *Hackerone) send_once(method string, uri string, body io.Reader) ([]byte, string, error) {
 	req, err := http.NewRequest(method, uri, body)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to create send: %w", err)
@@ -156,7 +186,10 @@ func (h1 *Hackerone) nextPage(body []byte) (string, error) {
 }
 
 func GetH1Token() string {
-	if token, err := os.ReadFile(filepath.Join(os.Getenv("HOME"), ".config/h1_token")); err == nil {
+	path := filepath.Join(os.Getenv("HOME"), ".config/h1_token")
+	log.Printf("Reading H1 token from %s then the H1_TOKEN env variable", path)
+
+	if token, err := os.ReadFile(path); err == nil {
 		return string(token)
 	}
 
