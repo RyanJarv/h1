@@ -115,28 +115,33 @@ func (h1 *Program) GetWeaknesses() (*types.Weaknesses, error) {
 }
 
 func (h1 *Hackerone) send(method string, uri string, body io.Reader) ([]byte, string, error) {
-	all, err := io.ReadAll(body)
-	if err != nil {
-		return nil, "", fmt.Errorf("Program.GetDetails: failed to read all: %w", err)
+	var all []byte
+	var err error
+	if body != nil {
+		if all, err = io.ReadAll(body); err != nil {
+			return nil, "", fmt.Errorf("Program.GetDetails: failed to read all: %w", err)
+		}
 	}
 
 	for retries := 0; retries < MaxRetries; retries++ {
-		respBody, next, err := h1.send_once(method, uri, bytes.NewReader(all))
+		respBody, next, err := h1.sendOnce(method, uri, bytes.NewReader(all))
 		// Check for specific error types
 		var opErr *net.OpError
-		var sysErr *syscall.Errno
+		var sysErr syscall.Errno
 		if errors.As(err, &opErr) {
-			if errors.As(opErr.Err, &sysErr) && errors.Is(*sysErr, syscall.ECONNRESET) {
+			if errors.As(opErr.Err, &sysErr) && errors.Is(sysErr, syscall.ECONNRESET) {
 				// Handle the connection reset specifically, e.g., retry or log
 				log.Printf("error: connection reset: %s", err)
 				continue
 			}
 		}
-		return respBody, next, nil
+		return respBody, next, err
 	}
-	log.Printf("error: exceeded max retries for %s %s", method, uri)
+
+	return nil, "", fmt.Errorf("failed to send request after %d retries", MaxRetries)
 }
-func (h1 *Hackerone) send_once(method string, uri string, body io.Reader) ([]byte, string, error) {
+
+func (h1 *Hackerone) sendOnce(method string, uri string, body io.Reader) ([]byte, string, error) {
 	req, err := http.NewRequest(method, uri, body)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to create send: %w", err)
@@ -151,7 +156,9 @@ func (h1 *Hackerone) send_once(method string, uri string, body io.Reader) ([]byt
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to send request: %w", err)
 	}
-	defer resp.Body.Close()
+	if resp != nil && resp.Body != nil {
+		defer resp.Body.Close()
+	}
 
 	if resp.StatusCode != 200 {
 		return nil, "", fmt.Errorf("api call failed: %s returned %s", uri, resp.Status)
