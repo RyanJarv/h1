@@ -12,13 +12,24 @@ import (
 	"os"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"github.com/ryanjarv/h1/pkg/types"
 )
 
 const MaxRetries = 3
 
-func (h1 *Hackerone) Programs(yield func(*Program, error) bool) {
+func (h1 *Hackerone) Programs(yield func(*Program) bool) {
+	h1.programs(func(p *Program, err error) bool {
+		if err != nil {
+			log.Printf("error getting programs: %s", err)
+			return true
+		}
+		return yield(p)
+	})
+}
+
+func (h1 *Hackerone) programs(yield func(*Program, error) bool) {
 	uri := fmt.Sprintf("https://api.hackerone.com/v1/hackers/programs")
 
 	for uri != "" {
@@ -26,7 +37,7 @@ func (h1 *Hackerone) Programs(yield func(*Program, error) bool) {
 		var resp []byte
 		resp, uri, err = h1.send("GET", uri, nil)
 		if err != nil {
-			if !yield(nil, fmt.Errorf("Program.GetDetails: getting program: %w", err)) {
+			if !yield(nil, fmt.Errorf("programs: getting programs: %w", err)) {
 				return
 			}
 		}
@@ -35,7 +46,7 @@ func (h1 *Hackerone) Programs(yield func(*Program, error) bool) {
 			Data []types.ProgramDetail
 		}{}
 		if err := json.Unmarshal(resp, &data); err != nil {
-			if !yield(nil, fmt.Errorf("Program.GetDetails: failed to unmarshal program: %w", err)) {
+			if !yield(nil, fmt.Errorf("programs: failed to unmarshal programs: %w", err)) {
 				return
 			}
 		}
@@ -78,15 +89,15 @@ func (h1 *Program) GetDetail() (*types.ProgramDetail, error) {
 
 	resp, uri, err := h1.send("GET", uri, nil)
 	if err != nil {
-		return nil, fmt.Errorf("Program.GetDetails: getting program: %w", err)
+		return nil, fmt.Errorf("GetDetail: getting program: %w", err)
 	} else if uri != "" {
-		return nil, fmt.Errorf("failed to get all pages: %s", uri)
+		return nil, fmt.Errorf("GetDetail: unexpected pagination for single program: %s", uri)
 	}
 
 	program := types.ProgramDetail{}
 	err = json.Unmarshal(resp, &program)
 	if err != nil {
-		return nil, fmt.Errorf("Program.GetDetails: failed to unmarshal program: %w", err)
+		return nil, fmt.Errorf("GetDetail: failed to unmarshal program: %w", err)
 	}
 
 	return &program, nil
@@ -100,15 +111,15 @@ func (h1 *Program) GetWeaknesses() (*types.Weaknesses, error) {
 
 	resp, uri, err = h1.send("GET", uri, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get %s: %w", uri, err)
+		return nil, fmt.Errorf("GetWeaknesses: getting weaknesses: %w", err)
 	} else if uri != "" {
-		return nil, fmt.Errorf("failed to get all pages")
+		return nil, fmt.Errorf("GetWeaknesses: unexpected pagination for weaknesses: %s", uri)
 	}
 
 	weaknesses := types.Weaknesses{}
 	err = json.Unmarshal(resp, &weaknesses)
 	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal program: %w", err)
+		return nil, fmt.Errorf("GetWeaknesses: failed to unmarshal weaknesses: %w", err)
 	}
 
 	return &weaknesses, nil
@@ -119,7 +130,7 @@ func (h1 *Hackerone) send(method string, uri string, body io.Reader) ([]byte, st
 	var err error
 	if body != nil {
 		if all, err = io.ReadAll(body); err != nil {
-			return nil, "", fmt.Errorf("Program.GetDetails: failed to read all: %w", err)
+			return nil, "", fmt.Errorf("send: failed to read request body: %w", err)
 		}
 	}
 
@@ -130,8 +141,10 @@ func (h1 *Hackerone) send(method string, uri string, body io.Reader) ([]byte, st
 		var sysErr syscall.Errno
 		if errors.As(err, &opErr) {
 			if errors.As(opErr.Err, &sysErr) && errors.Is(sysErr, syscall.ECONNRESET) {
-				// Handle the connection reset specifically, e.g., retry or log
-				log.Printf("error: connection reset: %s", err)
+				// Handle the connection reset specifically with exponential backoff
+				backoff := time.Duration(retries+1) * 100 * time.Millisecond
+				log.Printf("connection reset (attempt %d/%d): %s, retrying in %v", retries+1, MaxRetries, err, backoff)
+				time.Sleep(backoff)
 				continue
 			}
 		}
@@ -156,9 +169,7 @@ func (h1 *Hackerone) sendOnce(method string, uri string, body io.Reader) ([]byte
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to send request: %w", err)
 	}
-	if resp != nil && resp.Body != nil {
-		defer resp.Body.Close()
-	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
 		return nil, "", fmt.Errorf("api call failed: %s returned %s", uri, resp.Status)
@@ -194,14 +205,17 @@ func (h1 *Hackerone) nextPage(body []byte) (string, error) {
 
 func GetH1Token() string {
 	path := filepath.Join(os.Getenv("HOME"), ".config/h1_token")
-	log.Printf("Reading H1 token from %s then the H1_TOKEN env variable", path)
 
-	if token, err := os.ReadFile(path); err == nil {
-		return string(token)
+	if tokenBytes, err := os.ReadFile(path); err == nil {
+		log.Printf("Using H1 token from %s", path)
+		return string(tokenBytes)
 	}
 
 	if token := os.Getenv("H1_TOKEN"); token != "" {
-		return string(token)
+		log.Printf("Using H1 token from H1_TOKEN environment variable")
+		return token
 	}
+
+	log.Printf("No H1 token found in %s or H1_TOKEN environment variable", path)
 	return ""
 }
