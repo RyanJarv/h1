@@ -10,9 +10,9 @@ import (
 // Username must be provided.
 // Token is optional, if not provided it will be read from ~/.config/h1_token.
 type NewHackeroneInput struct {
-	Username string
+	Username string `json:"username"`
 
-	Token string
+	Token string `json:"token"`
 }
 
 func NewHackerone(input *NewHackeroneInput) *Hackerone {
