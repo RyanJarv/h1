@@ -19,13 +19,16 @@ import (
 
 const MaxRetries = 3
 
-func (h1 *Hackerone) Programs(yield func(*Program) bool) {
+func (h1 *Hackerone) Programs(yield func(Program) bool) {
 	h1.ProgramsWithErrs(func(p *Program, err error) bool {
 		if err != nil {
 			log.Printf("error getting programs: %s", err)
 			return true
+		} else if p == nil {
+			panic(fmt.Errorf("got nil program with no error"))
 		}
-		return yield(p)
+
+		return yield(*p)
 	})
 }
 
@@ -85,6 +88,7 @@ type Program struct {
 }
 
 func (h1 *Program) GetId() string { return h1.Handle }
+
 func (h1 *Program) GetDetail() (*types.ProgramDetail, error) {
 	uri := fmt.Sprintf("https://api.hackerone.com/v1/hackers/programs/%s", h1.Handle)
 
