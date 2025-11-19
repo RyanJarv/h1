@@ -84,6 +84,7 @@ type Program struct {
 	types.ProgramAttributes
 }
 
+func (h1 *Program) GetId() string { return h1.Handle }
 func (h1 *Program) GetDetail() (*types.ProgramDetail, error) {
 	uri := fmt.Sprintf("https://api.hackerone.com/v1/hackers/programs/%s", h1.Handle)
 
