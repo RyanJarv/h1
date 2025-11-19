@@ -239,7 +239,7 @@ func TestProgram_Programs(t *testing.T) {
 			h1 := tt.fields.Hackerone
 			var got []Program
 			var err error
-			h1.programs(func(p *Program, e error) bool {
+			h1.ProgramsWithErrs(func(p *Program, e error) bool {
 				if e != nil {
 					err = e
 					return false
@@ -352,7 +352,7 @@ func TestHackerone_Retries(t *testing.T) {
 
 			var programs []Program
 			var gotErr error
-			h1.programs(func(p *Program, err error) bool {
+			h1.ProgramsWithErrs(func(p *Program, err error) bool {
 				if err != nil {
 					gotErr = err
 					return false
@@ -487,7 +487,7 @@ func TestProgram__functional(t *testing.T) {
 	}
 
 	h1 := NewHackerone(&NewHackeroneInput{Username: user})
-	h1.programs(func(p *Program, err error) bool {
+	h1.ProgramsWithErrs(func(p *Program, err error) bool {
 		if err != nil {
 			t.Fatalf("getting programs: %s", err)
 		}

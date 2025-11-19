@@ -20,7 +20,7 @@ import (
 const MaxRetries = 3
 
 func (h1 *Hackerone) Programs(yield func(*Program) bool) {
-	h1.programs(func(p *Program, err error) bool {
+	h1.ProgramsWithErrs(func(p *Program, err error) bool {
 		if err != nil {
 			log.Printf("error getting programs: %s", err)
 			return true
@@ -29,7 +29,7 @@ func (h1 *Hackerone) Programs(yield func(*Program) bool) {
 	})
 }
 
-func (h1 *Hackerone) programs(yield func(*Program, error) bool) {
+func (h1 *Hackerone) ProgramsWithErrs(yield func(*Program, error) bool) {
 	uri := fmt.Sprintf("https://api.hackerone.com/v1/hackers/programs")
 
 	for uri != "" {
